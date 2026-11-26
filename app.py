@@ -3,7 +3,10 @@ from datetime import date
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user,
+    login_required, current_user,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
@@ -13,6 +16,8 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 
 db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
 
 
 class User(UserMixin, db.Model):
@@ -33,9 +38,16 @@ class Expense(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
 
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
 @app.route("/")
 def home():
-    return redirect(url_for("register"))
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -52,9 +64,37 @@ def register():
         user = User(username=username, password_hash=generate_password_hash(password))
         db.session.add(user)
         db.session.commit()
-        flash("Account created! Login comes in the next step.")
-        return redirect(url_for("register"))
+        flash("Account created! Please log in.")
+        return redirect(url_for("login"))
     return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"]
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for("dashboard"))
+        flash("Invalid username or password.")
+        return redirect(url_for("login"))
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Logged out.")
+    return redirect(url_for("login"))
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("dashboard.html")
 
 
 with app.app_context():
