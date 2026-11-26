@@ -1,5 +1,6 @@
 import os
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -18,6 +19,8 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
+
+CATEGORIES = ["Food", "Transport", "Rent", "Shopping", "Bills", "Entertainment", "Health", "Other"]
 
 
 class User(UserMixin, db.Model):
@@ -94,7 +97,47 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html")
+    expenses = (
+        Expense.query.filter_by(user_id=current_user.id)
+        .order_by(Expense.date.desc(), Expense.id.desc())
+        .all()
+    )
+    return render_template(
+        "dashboard.html",
+        expenses=expenses,
+        categories=CATEGORIES,
+        today=date.today().isoformat(),
+    )
+
+
+@app.route("/expenses/add", methods=["POST"])
+@login_required
+def add_expense():
+    try:
+        amount = Decimal(request.form["amount"])
+        if amount <= 0:
+            raise InvalidOperation
+        expense_date = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
+    except (InvalidOperation, ValueError):
+        flash("Enter a valid positive amount and date.")
+        return redirect(url_for("dashboard"))
+
+    category = request.form["category"]
+    if category not in CATEGORIES:
+        flash("Invalid category.")
+        return redirect(url_for("dashboard"))
+
+    expense = Expense(
+        amount=amount,
+        category=category,
+        description=request.form.get("description", "").strip(),
+        date=expense_date,
+        user_id=current_user.id,
+    )
+    db.session.add(expense)
+    db.session.commit()
+    flash("Expense added.")
+    return redirect(url_for("dashboard"))
 
 
 with app.app_context():
