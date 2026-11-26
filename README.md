@@ -6,7 +6,7 @@ A full-stack web app to track personal expenses and visualise spending patterns.
 
 > Hosted on a free tier, so the first load after a period of inactivity can take about a minute while the server wakes up.
 
-**Demo login:** username `demo` / password `demo1234`
+**Demo login:** username `test` / password `test123`
 
 ## Screenshots
 
