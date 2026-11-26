@@ -2,7 +2,7 @@ import os
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
@@ -44,6 +44,28 @@ class Expense(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+
+def parse_expense_form(form):
+    """Validate form data. Returns (amount, category, description, date) or None."""
+    try:
+        amount = Decimal(form["amount"])
+        if amount <= 0:
+            return None
+        expense_date = datetime.strptime(form["date"], "%Y-%m-%d").date()
+    except (InvalidOperation, ValueError, KeyError):
+        return None
+    category = form.get("category", "")
+    if category not in CATEGORIES:
+        return None
+    return amount, category, form.get("description", "").strip(), expense_date
+
+
+def get_own_expense_or_404(expense_id):
+    expense = Expense.query.filter_by(id=expense_id, user_id=current_user.id).first()
+    if expense is None:
+        abort(404)
+    return expense
 
 
 @app.route("/")
@@ -113,30 +135,47 @@ def dashboard():
 @app.route("/expenses/add", methods=["POST"])
 @login_required
 def add_expense():
-    try:
-        amount = Decimal(request.form["amount"])
-        if amount <= 0:
-            raise InvalidOperation
-        expense_date = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
-    except (InvalidOperation, ValueError):
-        flash("Enter a valid positive amount and date.")
+    parsed = parse_expense_form(request.form)
+    if parsed is None:
+        flash("Enter a valid positive amount, category and date.")
         return redirect(url_for("dashboard"))
-
-    category = request.form["category"]
-    if category not in CATEGORIES:
-        flash("Invalid category.")
-        return redirect(url_for("dashboard"))
-
+    amount, category, description, expense_date = parsed
     expense = Expense(
         amount=amount,
         category=category,
-        description=request.form.get("description", "").strip(),
+        description=description,
         date=expense_date,
         user_id=current_user.id,
     )
     db.session.add(expense)
     db.session.commit()
     flash("Expense added.")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/expenses/<int:expense_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_expense(expense_id):
+    expense = get_own_expense_or_404(expense_id)
+    if request.method == "POST":
+        parsed = parse_expense_form(request.form)
+        if parsed is None:
+            flash("Enter a valid positive amount, category and date.")
+            return redirect(url_for("edit_expense", expense_id=expense.id))
+        expense.amount, expense.category, expense.description, expense.date = parsed
+        db.session.commit()
+        flash("Expense updated.")
+        return redirect(url_for("dashboard"))
+    return render_template("edit_expense.html", expense=expense, categories=CATEGORIES)
+
+
+@app.route("/expenses/<int:expense_id>/delete", methods=["POST"])
+@login_required
+def delete_expense(expense_id):
+    expense = get_own_expense_or_404(expense_id)
+    db.session.delete(expense)
+    db.session.commit()
+    flash("Expense deleted.")
     return redirect(url_for("dashboard"))
 
 
