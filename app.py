@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv
@@ -68,6 +69,20 @@ def get_own_expense_or_404(expense_id):
     return expense
 
 
+def last_n_months(n):
+    """Return a list of (year, month) for the last n months, oldest first."""
+    today = date.today()
+    year, month = today.year, today.month
+    months = []
+    for _ in range(n):
+        months.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return list(reversed(months))
+
+
 @app.route("/")
 def home():
     if current_user.is_authenticated:
@@ -124,11 +139,36 @@ def dashboard():
         .order_by(Expense.date.desc(), Expense.id.desc())
         .all()
     )
+
+    # Monthly totals for the last 6 months
+    months = last_n_months(6)
+    monthly_totals = defaultdict(float)
+    for e in expenses:
+        monthly_totals[(e.date.year, e.date.month)] += float(e.amount)
+    month_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months]
+    month_values = [round(monthly_totals[(y, m)], 2) for y, m in months]
+
+    # Category breakdown for the current month
+    today = date.today()
+    category_totals = defaultdict(float)
+    for e in expenses:
+        if e.date.year == today.year and e.date.month == today.month:
+            category_totals[e.category] += float(e.amount)
+    category_labels = list(category_totals.keys())
+    category_values = [round(v, 2) for v in category_totals.values()]
+    this_month_total = round(sum(category_values), 2)
+
     return render_template(
         "dashboard.html",
         expenses=expenses,
         categories=CATEGORIES,
-        today=date.today().isoformat(),
+        today=today.isoformat(),
+        month_labels=month_labels,
+        month_values=month_values,
+        category_labels=category_labels,
+        category_values=category_values,
+        this_month_total=this_month_total,
+        this_month_name=today.strftime("%B %Y"),
     )
 
 
