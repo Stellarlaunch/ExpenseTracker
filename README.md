@@ -10,13 +10,21 @@ A full-stack web app to track personal expenses and visualise spending patterns.
 
 ## Screenshots
 
-| Login | Dashboard |
-|---|---|
-| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) |
+### Dashboard
 
-| Expenses | Edit expense |
+![Dashboard](screenshots/dashboard.png)
+
+### Analytics charts and expense management
+
+| Charts | Add expense and list |
 |---|---|
-| ![Expenses](screenshots/expenses.png) | ![Edit](screenshots/edit.png) |
+| ![Charts](screenshots/charts.png) | ![Expenses](screenshots/expenses.png) |
+
+### Login and edit
+
+| Login | Edit expense |
+|---|---|
+| ![Login](screenshots/login.png) | ![Edit](screenshots/edit.png) |
 
 ## Features
 
@@ -94,8 +102,4 @@ ExpenseTracker/
 
 - Date range filters and CSV export
 - Monthly budgets with overspend alerts
-- Automated tests
-
-## Author
-
-**Dhiraj**: [GitHub](https://github.com/Stellarlaunch)
+-
