@@ -1,9 +1,10 @@
 import os
 from datetime import date
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 
@@ -34,7 +35,26 @@ class Expense(db.Model):
 
 @app.route("/")
 def home():
-    return "Expense Tracker is running!"
+    return redirect(url_for("register"))
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"]
+        if not username or len(password) < 6:
+            flash("Username required and password must be at least 6 characters.")
+            return redirect(url_for("register"))
+        if User.query.filter_by(username=username).first():
+            flash("Username already taken.")
+            return redirect(url_for("register"))
+        user = User(username=username, password_hash=generate_password_hash(password))
+        db.session.add(user)
+        db.session.commit()
+        flash("Account created! Login comes in the next step.")
+        return redirect(url_for("register"))
+    return render_template("register.html")
 
 
 with app.app_context():
